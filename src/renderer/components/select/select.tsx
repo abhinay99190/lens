@@ -7,49 +7,38 @@
 // API docs: https://react-select.com/
 import "./select.scss";
 
-import type { ReactNode } from "react";
 import React from "react";
 import { computed, makeObservable } from "mobx";
 import { observer } from "mobx-react";
 import ReactSelect, { components } from "react-select";
-import ReactSelectCreatable from "react-select/creatable";
-import type { ActionMeta, OptionTypeBase, Props as ReactSelectProps, Styles } from "react-select";
-import type { CreatableProps } from "react-select/creatable";
-
+import type { Props as ReactSelectProps, GroupBase } from "react-select";
 import { ThemeStore } from "../../theme.store";
 import { autoBind, cssNames } from "../../utils";
 
 const { Menu } = components;
 
-export interface GroupSelectOption<T extends SelectOption = SelectOption> {
-  label: ReactNode;
-  options: T[];
-}
-
-export interface SelectOption<T = any> {
+/**
+ * @deprecated This type is no longer used
+ */
+export interface SelectOption<T> {
   value: T;
-  label?: React.ReactNode;
+  label?: React.ReactElement | string;
 }
 
-export interface SelectProps<T = any> extends ReactSelectProps<T, boolean>, CreatableProps<T, boolean> {
+export interface SelectProps<Option, IsMulti extends boolean, Group extends GroupBase<Option> = GroupBase<Option>> extends ReactSelectProps<Option, IsMulti, Group> {
   id?: string; // Optional only because of Extension API. Required to make Select deterministic in unit tests
-  value?: T;
   themeName?: "dark" | "light" | "outlined" | "lens";
   menuClass?: string;
-  isCreatable?: boolean;
-  autoConvertOptions?: boolean; // to internal format (i.e. {value: T, label: string}[]), not working with groups
-  onChange?(option: T, meta?: ActionMeta<any>): void;
 }
 
 @observer
-export class Select extends React.Component<SelectProps> {
-  static defaultProps: Omit<SelectProps, "id"> = {
-    autoConvertOptions: true,
+export class Select<Option, IsMulti extends boolean = false, Group extends GroupBase<Option> = GroupBase<Option>> extends React.Component<SelectProps<Option, IsMulti, Group>> {
+  static defaultProps = {
     menuPortalTarget: document.body,
     menuPlacement: "auto",
   };
 
-  constructor(props: SelectProps) {
+  constructor(props: SelectProps<Option, IsMulti, Group>) {
     super(props);
     makeObservable(this);
     autoBind(this);
@@ -61,88 +50,42 @@ export class Select extends React.Component<SelectProps> {
     return `theme-${themeName}`;
   }
 
-  private styles: Styles<OptionTypeBase, boolean> = {
-    menuPortal: styles => ({
-      ...styles,
-      zIndex: "auto",
-    }),
-  };
+  onKeyDown(evt: React.KeyboardEvent<HTMLDivElement>) {
+    this.props.onKeyDown?.(evt);
 
-  protected isValidOption(opt: SelectOption | any) {
-    return typeof opt === "object" && opt.value !== undefined;
-  }
-
-  @computed get selectedOption() {
-    const { value, isMulti } = this.props;
-
-    if (isMulti) {
-      return this.options.filter(opt => {
-        const values = value ? [].concat(value) : [];
-
-        return values.includes(opt) || values.includes(opt.value);
-      });
+    if (evt.nativeEvent.code === "Escape") {
+      evt.stopPropagation(); // don't close the <Dialog/>
     }
-
-    return this.options.find(opt => opt === value || opt.value === value) || null;
-  }
-
-  @computed get options(): SelectOption[] {
-    const { autoConvertOptions, options } = this.props;
-
-    if (autoConvertOptions && Array.isArray(options)) {
-      return options.map(opt => {
-        return this.isValidOption(opt) ? opt : { value: opt, label: String(opt) };
-      });
-    }
-
-    return options as SelectOption[];
-  }
-
-  onChange(value: SelectOption, meta: ActionMeta<any>) {
-    if (this.props.onChange) {
-      this.props.onChange(value, meta);
-    }
-  }
-
-  onKeyDown(evt: React.KeyboardEvent<HTMLElement>) {
-    if (this.props.onKeyDown) {
-      this.props.onKeyDown(evt);
-    }
-    const escapeKey = evt.nativeEvent.code === "Escape";
-
-    if (escapeKey) evt.stopPropagation(); // don't close the <Dialog/>
   }
 
   render() {
     const {
-      className, menuClass, isCreatable, autoConvertOptions,
-      value, options, components = {}, id: inputId, ...props
+      className, menuClass, components = {}, ...props
     } = this.props;
     const WrappedMenu = components.Menu ?? Menu;
 
-    const selectProps: Partial<SelectProps> = {
-      ...props,
-      ...(inputId ? { inputId }: {}),
-      styles: this.styles,
-      value: autoConvertOptions ? this.selectedOption : value,
-      options: autoConvertOptions ? this.options : options,
-      onChange: this.onChange,
-      onKeyDown: this.onKeyDown,
-      className: cssNames("Select", this.themeClass, className),
-      classNamePrefix: "Select",
-      components: {
-        ...components,
-        Menu: props => (
-          <WrappedMenu
-            {...props}
-            className={cssNames(menuClass, this.themeClass, props.className)}
-          />
-        ),
-      },
-    };
-
-    return isCreatable
-      ? <ReactSelectCreatable {...selectProps}/>
-      : <ReactSelect {...selectProps}/>;
+    return (
+      <ReactSelect
+        {...props}
+        styles={{
+          menuPortal: styles => ({
+            ...styles,
+            zIndex: "auto",
+          }),
+        }}
+        onKeyDown={this.onKeyDown}
+        className={cssNames("Select", this.themeClass, className)}
+        classNamePrefix="Select"
+        components={{
+          ...components,
+          Menu: props => (
+            <WrappedMenu
+              {...props}
+              className={cssNames(menuClass, this.themeClass, props.className)}
+            />
+          ),
+        }}
+      />
+    );
   }
 }

@@ -13,9 +13,9 @@ import { action, computed, makeObservable, observable, reaction, runInAction, wh
 import type { CatalogEntityStore } from "./catalog-entity-store/catalog-entity.store";
 import { navigate } from "../../navigation";
 import { MenuItem, MenuActions } from "../menu";
-import type { CatalogEntityContextMenu, CatalogEntityContextMenuContext } from "../../api/catalog-entity";
+import type { CatalogEntityContextMenu } from "../../api/catalog-entity";
 import { ConfirmDialog } from "../confirm-dialog";
-import type { CatalogEntity } from "../../../common/catalog";
+import type { CatalogCategory, CatalogEntity } from "../../../common/catalog";
 import { catalogCategoryRegistry } from "../../../common/catalog";
 import { CatalogAddButton } from "./catalog-add-button";
 import { Notifications } from "../notifications";
@@ -62,7 +62,7 @@ interface Dependencies {
 
 @observer
 class NonInjectedCatalog extends React.Component<Dependencies> {
-  @observable private contextMenu: CatalogEntityContextMenuContext;
+  private readonly menuItems = observable.array<CatalogEntityContextMenu>();
   @observable activeTab?: string;
 
   constructor(props: Dependencies) {
@@ -85,10 +85,6 @@ class NonInjectedCatalog extends React.Component<Dependencies> {
   }
 
   async componentDidMount() {
-    this.contextMenu = {
-      menuItems: observable.array([]),
-      navigate: (url: string) => navigate(url),
-    };
     disposeOnUnmount(this, [
       this.props.catalogEntityStore.watch(),
       reaction(() => this.routeActiveTab, async (routeTab) => {
@@ -100,24 +96,29 @@ class NonInjectedCatalog extends React.Component<Dependencies> {
 
           runInAction(() => {
             this.activeTab = routeTab;
-            this.props.catalogEntityStore.activeCategory = item;
+            this.props.catalogEntityStore.activeCategory.set(item);
           });
         } catch (error) {
           console.error(error);
-          Notifications.error(<p>Unknown category: {routeTab}</p>);
+          Notifications.error((
+            <p>
+              {"Unknown category: "}
+              {routeTab}
+            </p>
+          ));
         }
       }, { fireImmediately: true }),
     ]);
 
     // If active category is filtered out, automatically switch to the first category
     disposeOnUnmount(this, reaction(() => catalogCategoryRegistry.filteredItems, () => {
-      if (!catalogCategoryRegistry.filteredItems.find(item => item.getId() === this.props.catalogEntityStore.activeCategory.getId())) {
+      if (!catalogCategoryRegistry.filteredItems.find(item => item.getId() === this.props.catalogEntityStore.activeCategory.get()?.getId())) {
         const item = catalogCategoryRegistry.filteredItems[0];
 
         runInAction(() => {
           if (item) {
             this.activeTab = item.getId();
-            this.props.catalogEntityStore.activeCategory = item;
+            this.props.catalogEntityStore.activeCategory.set(item);
           }
         });
       }
@@ -139,7 +140,7 @@ class NonInjectedCatalog extends React.Component<Dependencies> {
 
   onDetails = (entity: CatalogEntity) => {
     if (this.props.catalogEntityStore.selectedItemId) {
-      this.props.catalogEntityStore.selectedItemId = null;
+      this.props.catalogEntityStore.selectedItemId.set(undefined);
     } else {
       this.props.catalogEntityStore.onRun(entity);
     }
@@ -185,26 +186,25 @@ class NonInjectedCatalog extends React.Component<Dependencies> {
     }
   });
 
-  renderNavigation() {
-    return (
-      <CatalogMenu activeItem={this.activeTab} onItemClick={this.onTabChange} />
-    );
-  }
-
   renderItemMenu = (entity: CatalogEntity) => {
     const onOpen = () => {
-      this.contextMenu.menuItems = [];
-
-      entity.onContextMenuOpen(this.contextMenu);
+      this.menuItems.clear();
+      entity.onContextMenuOpen({
+        menuItems: this.menuItems,
+        navigate: (url) => navigate(url),
+      });
     };
 
     return (
       <MenuActions onOpen={onOpen}>
-        <MenuItem key="open-details" onClick={() => this.props.catalogEntityStore.selectedItemId = entity.getId()}>
+        <MenuItem
+          key="open-details"
+          onClick={() => this.props.catalogEntityStore.selectedItemId.set(entity.getId())}
+        >
           View Details
         </MenuItem>
         {
-          this.contextMenu.menuItems.map((menuItem, index) => (
+          this.menuItems.map((menuItem, index) => (
             <MenuItem key={index} onClick={() => this.onMenuItemClick(menuItem)}>
               {menuItem.title}
             </MenuItem>
@@ -239,7 +239,6 @@ class NonInjectedCatalog extends React.Component<Dependencies> {
         <Icon
           small
           className={styles.pinIcon}
-          material={!isItemInHotbar && "push_pin"}
           svg={isItemInHotbar ? "push_off" : "push_pin"}
           tooltip={isItemInHotbar ? "Remove from Hotbar" : "Add to Hotbar"}
           onClick={prevDefault(() => isItemInHotbar ? this.removeFromHotbar(entity) : this.addToHotbar(entity))}
@@ -248,15 +247,12 @@ class NonInjectedCatalog extends React.Component<Dependencies> {
     );
   }
 
-  renderViews = () => {
-    const { catalogEntityStore, customCategoryViews } = this.props;
-    const { activeCategory } = catalogEntityStore;
-
+  renderViews = (activeCategory: CatalogCategory | undefined) => {
     if (!activeCategory) {
-      return this.renderList();
+      return this.renderList(activeCategory);
     }
 
-    const customViews = customCategoryViews.get()
+    const customViews = this.props.customCategoryViews.get()
       .get(activeCategory.spec.group)
       ?.get(activeCategory.spec.names.kind);
     const renderView = ({ View }: CustomCategoryViewComponents, index: number) => (
@@ -269,15 +265,14 @@ class NonInjectedCatalog extends React.Component<Dependencies> {
     return (
       <>
         {customViews?.before.map(renderView)}
-        {this.renderList()}
+        {this.renderList(activeCategory)}
         {customViews?.after.map(renderView)}
       </>
     );
   };
 
-  renderList() {
+  renderList(activeCategory: CatalogCategory | undefined) {
     const { catalogEntityStore, getCategoryColumns } = this.props;
-    const { activeCategory } = catalogEntityStore;
     const tableId = activeCategory
       ? `catalog-items-${activeCategory.metadata.name.replace(" ", "")}`
       : "catalog-items";
@@ -287,14 +282,15 @@ class NonInjectedCatalog extends React.Component<Dependencies> {
     }
 
     return (
-      <ItemListLayout
+      <ItemListLayout<CatalogEntity, false>
         className={styles.Catalog}
         tableId={tableId}
         renderHeaderTitle={activeCategory?.metadata.name ?? "Browse All"}
         isSelectable={false}
         isConfigurable={true}
+        preloadStores={false}
         store={catalogEntityStore}
-        getItems={() => catalogEntityStore.entities}
+        getItems={() => catalogEntityStore.entities.get()}
         customizeTableRowProps={entity => ({
           disabled: !entity.isEnabled(),
         })}
@@ -310,27 +306,37 @@ class NonInjectedCatalog extends React.Component<Dependencies> {
       return null;
     }
 
-    const selectedEntity = this.props.catalogEntityStore.selectedItem;
+    const activeCategory = this.props.catalogEntityStore.activeCategory.get();
+    const selectedItem = this.props.catalogEntityStore.selectedItem.get();
 
     return (
-      <MainLayout sidebar={this.renderNavigation()}>
+      <MainLayout
+        sidebar={(
+          <CatalogMenu
+            activeTab={this.activeTab}
+            onItemClick={this.onTabChange}
+          />
+        )}
+      >
         <div className={styles.views}>
-          {this.renderViews()}
+          {this.renderViews(activeCategory)}
         </div>
         {
-          selectedEntity
-            ? <CatalogEntityDetails
-              entity={selectedEntity}
-              hideDetails={() => this.props.catalogEntityStore.selectedItemId = null}
-              onRun={() => this.props.catalogEntityStore.onRun(selectedEntity)}
-            />
-            : (
-              <RenderDelay>
-                <CatalogAddButton
-                  category={this.props.catalogEntityStore.activeCategory}
-                />
-              </RenderDelay>
+          selectedItem
+            ? (
+              <CatalogEntityDetails
+                entity={selectedItem}
+                hideDetails={() => this.props.catalogEntityStore.selectedItemId.set(undefined)}
+                onRun={() => this.props.catalogEntityStore.onRun(selectedItem)}
+              />
             )
+            : activeCategory
+              ? (
+                <RenderDelay>
+                  <CatalogAddButton category={activeCategory} />
+                </RenderDelay>
+              )
+              : null
         }
       </MainLayout>
     );
