@@ -60,7 +60,7 @@ export class Select<Option, IsMulti extends boolean = false, Group extends Group
 
   render() {
     const {
-      className, menuClass, components = {}, ...props
+      className, menuClass, components = {}, value = null, ...props
     } = this.props;
     const WrappedMenu = components.Menu ?? Menu;
 
@@ -73,6 +73,7 @@ export class Select<Option, IsMulti extends boolean = false, Group extends Group
             zIndex: "auto",
           }),
         }}
+        value={value}
         onKeyDown={this.onKeyDown}
         className={cssNames("Select", this.themeClass, className)}
         classNamePrefix="Select"
