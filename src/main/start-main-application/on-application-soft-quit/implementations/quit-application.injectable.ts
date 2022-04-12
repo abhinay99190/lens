@@ -4,9 +4,9 @@
  */
 import { getInjectable } from "@ogre-tools/injectable";
 import { onApplicationHardQuitInjectionToken } from "../../on-application-hard-quit/on-application-hard-quit-injection-token";
-import { isIntegrationTesting } from "../../../../common/vars";
 import { runManyFor } from "../../run-many-for";
 import { onApplicationSoftQuitInjectionToken } from "../on-application-soft-quit-injection-token";
+import isIntegrationTestingInjectable from "../../../../common/vars/is-integration-testing.injectable";
 
 const quitApplicationInjectable = getInjectable({
   id: "prevent-application-from-closing-involuntarily",
@@ -14,17 +14,18 @@ const quitApplicationInjectable = getInjectable({
   instantiate: (di) => {
     const runMany = runManyFor(di);
     const runOnApplicationQuit = runMany(onApplicationHardQuitInjectionToken);
+    const isIntegrationTesting = di.inject(isIntegrationTestingInjectable);
 
     return {
-      run: async ({ event }) => {
+      run: async (runParameter) => {
         if (!isIntegrationTesting) {
           // &&!autoUpdateIsRunning) {
-          event.preventDefault();
+          runParameter.cancel();
 
           return;
         }
 
-        await runOnApplicationQuit({ event });
+        await runOnApplicationQuit(runParameter);
       },
     };
   },

@@ -43,8 +43,8 @@ export class HotbarStore extends BaseStore<HotbarStoreModel> {
       },
       migrations,
     });
+
     makeObservable(this);
-    this.load();
   }
 
   @computed get activeHotbarId() {
