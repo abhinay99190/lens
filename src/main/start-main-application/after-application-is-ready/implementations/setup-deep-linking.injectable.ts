@@ -19,15 +19,12 @@ const setupDeepLinking = getInjectable({
     return {
       run: () => {
         app.on("open-url", async (event, url) => {
-          console.log("mikko", 1, url);
           event.preventDefault();
 
           await lensProtocolRouterMain.route(url);
         });
 
         app.on("second-instance", async (_, commandLineArguments) => {
-          console.log("mikko", 2);
-
           for (const arg of commandLineArguments) {
             if (arg.toLowerCase().startsWith("lens://")) {
               await lensProtocolRouterMain.route(arg);
