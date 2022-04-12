@@ -8,7 +8,7 @@ import packageInfo from "../../../package.json";
 import { Menu, Tray } from "electron";
 import { autorun, IComputedValue } from "mobx";
 import { showAbout } from "../menu/menu";
-import { checkForUpdates, isAutoUpdateEnabled } from "../app-updater";
+import { checkForUpdates } from "../app-updater";
 import type { WindowManager } from "../window-manager";
 import logger from "../logger";
 import { isDevelopment, isWindows, productName } from "../../common/vars";
@@ -34,6 +34,7 @@ export function initTray(
   trayMenuItems: IComputedValue<TrayMenuRegistration[]>,
   navigateToPreferences: () => void,
   stopServicesAndExitApp: () => void,
+  isAutoUpdateEnabled: () => boolean,
 ) {
   const icon = getTrayIcon();
 
@@ -52,7 +53,7 @@ export function initTray(
   const disposers = [
     autorun(() => {
       try {
-        const menu = createTrayMenu(windowManager, toJS(trayMenuItems.get()), navigateToPreferences, stopServicesAndExitApp);
+        const menu = createTrayMenu(windowManager, toJS(trayMenuItems.get()), navigateToPreferences, stopServicesAndExitApp, isAutoUpdateEnabled);
 
         tray.setContextMenu(menu);
       } catch (error) {
@@ -83,6 +84,7 @@ function createTrayMenu(
   extensionTrayItems: TrayMenuRegistration[],
   navigateToPreferences: () => void,
   stopServicesAndExitApp: () => void,
+  isAutoUpdateEnabled: () => boolean,
 ): Menu {
   let template: Electron.MenuItemConstructorOptions[] = [
     {
