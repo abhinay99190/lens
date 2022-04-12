@@ -11,7 +11,7 @@ export const getStartableStoppable = (
 
   return {
     start: () => {
-      if(started) {
+      if (started) {
         throw new Error("Tried to start something that has already started.");
       }
 
