@@ -131,6 +131,7 @@ export const htmlTemplate = path.resolve(rendererDir, "template.html");
 export const sassCommonVars = path.resolve(rendererDir, "components/vars.scss");
 
 // Special runtime paths
+// Use staticDirInjectable instead
 defineGlobal("__static", {
   get() {
     const root = isDevelopment
