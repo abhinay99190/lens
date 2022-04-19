@@ -5,7 +5,7 @@
 
 import { action, observable, IComputedValue, computed, ObservableMap, runInAction, makeObservable, observe } from "mobx";
 import type { CatalogEntity } from "../../../common/catalog";
-import { catalogEntityRegistry } from "../../catalog";
+import type { CatalogEntityRegistry } from "../../catalog";
 import { FSWatcher, watch } from "chokidar";
 import fs from "fs";
 import path from "path";
@@ -51,6 +51,7 @@ interface Dependencies {
   directoryForKubeConfigs: string;
   createCluster: (model: ClusterModel) => Cluster;
   clusterManager: ClusterManager;
+  catalogEntityRegistry: CatalogEntityRegistry;
 }
 
 const kubeConfigSyncName = "lens:kube-sync";
@@ -74,7 +75,7 @@ export class KubeconfigSyncManager {
 
     logger.info(`${logPrefix} starting requested syncs`);
 
-    catalogEntityRegistry.addComputedSource(kubeConfigSyncName, computed(() => (
+    this.dependencies.catalogEntityRegistry.addComputedSource(kubeConfigSyncName, computed(() => (
       Array.from(iter.flatMap(
         this.sources.values(),
         ([entities]) => entities.get(),
@@ -108,7 +109,7 @@ export class KubeconfigSyncManager {
       this.stopOldSync(filePath);
     }
 
-    catalogEntityRegistry.removeSource(kubeConfigSyncName);
+    this.dependencies.catalogEntityRegistry.removeSource(kubeConfigSyncName);
     this.syncing = false;
   }
 

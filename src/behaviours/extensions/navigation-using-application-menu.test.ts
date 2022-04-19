@@ -11,6 +11,7 @@ import type { ExtensionsStore } from "../../extensions/extensions-store/extensio
 import fileSystemProvisionerStoreInjectable from "../../extensions/extension-loader/create-extension-instance/file-system-provisioner-store/file-system-provisioner-store.injectable";
 import type { FileSystemProvisionerStore } from "../../extensions/extension-loader/create-extension-instance/file-system-provisioner-store/file-system-provisioner-store";
 import focusWindowInjectable from "../../renderer/ipc-channel-listeners/focus-window.injectable";
+import extensionDiscoveryInjectable from "../../extensions/extension-discovery/extension-discovery.injectable";
 
 // TODO: Make components free of side effects by making them deterministic
 jest.mock("../../renderer/components/input/input");
@@ -23,6 +24,8 @@ describe("extensions - navigation using application menu", () => {
   beforeEach(async () => {
     applicationBuilder = getApplicationBuilder().beforeSetups(({ mainDi, rendererDi }) => {
       mainDi.override(isAutoUpdateEnabledInjectable, () => () => false);
+      mainDi.override(extensionDiscoveryInjectable, () => ({}));
+      rendererDi.override(extensionDiscoveryInjectable, () => ({}));
       rendererDi.override(extensionsStoreInjectable, () => ({}) as unknown as ExtensionsStore);
       rendererDi.override(fileSystemProvisionerStoreInjectable, () => ({}) as unknown as FileSystemProvisionerStore);
 

@@ -4,7 +4,7 @@
  */
 
 import { action, computed, type IComputedValue, type IObservableArray, makeObservable, observable } from "mobx";
-import { CatalogCategoryRegistry, catalogCategoryRegistry, CatalogEntity, CatalogEntityConstructor } from "../../common/catalog";
+import type { CatalogCategoryRegistry, CatalogEntity, CatalogEntityConstructor } from "../../common/catalog";
 import { iter } from "../../common/utils";
 
 export class CatalogEntityRegistry {
@@ -47,8 +47,3 @@ export class CatalogEntityRegistry {
     return this.items.filter((item) => item instanceof constructor) as T[];
   }
 }
-
-/**
- * @deprecated Switch to using catalogEntityRegistryInjectable
- */
-export const catalogEntityRegistry = new CatalogEntityRegistry(catalogCategoryRegistry);
